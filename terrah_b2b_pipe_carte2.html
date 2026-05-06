@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terrah — B2B Pipeline</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--bg:#0e0e0e;--surface:#161616;--surface2:#1e1e1e;--border:#2a2a2a;--text:#f0ede8;--muted:#555;--accent:#c8a97e}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh}
+header{padding:14px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.logo{font-size:11px;font-family:'DM Mono',monospace;letter-spacing:.18em;color:var(--accent);text-transform:uppercase}
+.header-right{display:flex;align-items:center;gap:10px}
+button{background:var(--accent);color:#0e0e0e;border:none;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;padding:6px 13px;border-radius:4px;cursor:pointer;transition:opacity .2s;letter-spacing:.04em}
+button:hover{opacity:.82}
+.btn-sec{background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-weight:600}
+.btn-sec:hover{color:var(--text);opacity:1}
+.stats-bar{display:flex;gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
+.stat{flex:1;padding:11px 18px;background:var(--surface);display:flex;flex-direction:column;gap:2px}
+.stat-val{font-size:20px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
+.stat-val.red{color:#e87e7e}
+.stat-label{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.1em}
+.toolbar{padding:9px 28px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.view-toggle{display:flex;background:var(--surface2);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
+.view-btn{background:transparent;color:var(--muted);border:none;padding:5px 13px;font-size:11px;cursor:pointer;font-weight:700;letter-spacing:.04em;transition:all .15s}
+.view-btn.active{background:var(--accent);color:#0e0e0e}
+.filter-group{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}
+select,input[type=text]{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:10px;padding:5px 8px;border-radius:4px;outline:none;cursor:pointer}
+select:focus,input[type=text]:focus{border-color:var(--accent)}
+input[type=text]::placeholder{color:var(--muted)}
+.main{padding:18px 28px}
+
+/* OVERVIEW */
+.ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ov-grid .full{grid-column:1/-1}
+.ov-block{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 20px}
+.ov-title{font-size:9px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.ov-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;gap:8px}
+.ov-row:last-child{border-bottom:none}
+.ov-row-val{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);white-space:nowrap}
+.ov-bar-wrap{flex:1;background:var(--border);height:3px;border-radius:2px;overflow:hidden;margin:0 10px}
+.ov-bar{height:100%;border-radius:2px;transition:width .4s ease}
+.big-num{font-size:30px;font-weight:800;color:var(--accent);line-height:1;margin-bottom:2px}
+.big-label{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace}
+
+.cat-filter-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:9px;padding:4px 9px;border-radius:3px;cursor:pointer;font-weight:600;transition:all .15s}
+.cat-filter-btn:hover{color:var(--text)}
+.cat-filter-btn.active{color:#0e0e0e;font-weight:700}
+/* donut */
+.donut-sel{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.donut-sel button{background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:9px;padding:3px 9px;font-weight:600;border-radius:3px}
+.donut-sel button.active{background:var(--accent);color:#0e0e0e;border-color:var(--accent)}
+.donut-wrap{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.donut-legend{display:flex;flex-direction:column;gap:6px;flex:1;min-width:130px}
+.legend-row{display:flex;align-items:center;gap:7px;font-size:11px;padding:2px 5px;border-radius:3px;cursor:default}
+.legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.legend-label{flex:1;font-weight:600}
+.legend-val{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+.legend-pct{font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);min-width:32px;text-align:right}
+
+/* cat cards */
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:9px}
+.cat-card{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:11px 13px;border-left:3px solid #888;cursor:pointer;transition:border-color .15s,transform .1s}
+.cat-card:hover{transform:translateY(-1px)}
+.cat-card .cc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.cat-card .cc-name{font-size:12px;font-weight:700}
+.cat-card .cc-total{font-size:10px;font-family:'DM Mono',monospace;color:var(--muted)}
+.cat-card .cc-bar{background:var(--border);height:2px;border-radius:1px;margin-bottom:7px}
+.cat-card .cc-bar-fill{height:2px;border-radius:1px}
+.cat-card .cc-stats{display:flex;gap:8px;font-size:9px;font-family:'DM Mono',monospace;flex-wrap:wrap}
+
+/* kanban */
+.kanban{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px}
+.kanban::-webkit-scrollbar{height:3px}
+.kanban::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.k-col{flex:0 0 185px;background:var(--surface);border-radius:5px;border:1px solid var(--border);overflow:hidden}
+.k-header{padding:8px 11px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.k-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-family:'DM Mono',monospace}
+.k-count{font-size:9px;font-family:'DM Mono',monospace;color:var(--muted);background:var(--surface2);padding:1px 5px;border-radius:8px}
+.k-cards{padding:6px;display:flex;flex-direction:column;gap:5px;min-height:40px}
+.card{background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:8px 10px;cursor:pointer;transition:border-color .15s,transform .1s;position:relative}
+.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.card.alert{border-left:3px solid #e87e7e}
+.card.flagmort{border-left:3px solid #ff4444}
+.card-name{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px}
+.card-cat{font-size:9px;font-family:'DM Mono',monospace;margin-bottom:3px}
+.card-date{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:3px}
+.card-dot{position:absolute;top:6px;right:6px;width:5px;height:5px;border-radius:50%}
+
+/* list */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:8px 11px;text-align:left;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap}
+th:hover{color:var(--text)}
+td{padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:var(--surface2)}
+.row-alert td:first-child{border-left:3px solid #e87e7e}
+.row-flagmort td:first-child{border-left:3px solid #ff4444}
+.tag{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;padding:2px 6px;border-radius:3px;letter-spacing:.04em;white-space:nowrap}
+.tag-ciblé{background:#252525;color:#666}
+.tag-contacté{background:#1a3a55;color:#7eb5c8}
+.tag-cafe-depot{background:#3a2a10;color:#c8a97e}
+.tag-visité{background:#1a4a3a;color:#7ec8a0}
+.tag-devis{background:#3a3a10;color:#c8c07e}
+.tag-relancé{background:#4a2a10;color:#c89a7e}
+.tag-relancé2{background:#5a1a10;color:#c87e7e}
+.tag-p1{background:#0a3a1a;color:#7ec898}
+.tag-p2{background:#053a10;color:#5ec878}
+.tag-mort{background:#2a1010;color:#554}
+.days-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 6px;border-radius:3px;font-weight:500}
+.days-ok{color:var(--muted)}
+.days-warn{background:#3a2a10;color:#c8a97e}
+.days-hot{background:#4a1010;color:#e87e7e}
+.comment-cell{max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+
+/* modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:8px;width:450px;max-width:95vw;padding:24px 28px}
+.modal-name{font-size:18px;font-weight:800;margin-bottom:3px}
+.modal-sub{font-size:12px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 16px;margin-bottom:14px}
+.modal-field label{font-size:9px;font-family:'DM Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:2px}
+.modal-field span{font-size:12px;font-weight:600}
+.modal-comment{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-size:12px;line-height:1.5;margin-bottom:14px;color:var(--text)}
+
+/* map popup dark */
+.leaflet-popup-content-wrapper{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,.6)}
+.leaflet-popup-tip{background:var(--surface)}
+.leaflet-popup-content{margin:12px 14px;font-family:'Syne',sans-serif;min-width:180px}
+.pop-name{font-size:13px;font-weight:700;margin-bottom:4px}
+.pop-row{font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);margin-bottom:2px}
+.pop-row span{color:var(--text)}
+.leaflet-control-zoom a{background:var(--surface2)!important;color:var(--text)!important;border-color:var(--border)!important}
+.leaflet-control-zoom a:hover{background:var(--border)!important}
+/* map legend */
+.map-legend{position:absolute;bottom:20px;right:10px;z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:10px 13px;font-family:'DM Mono',monospace;font-size:10px}
+.map-legend-row{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.map-legend-row:last-child{margin-bottom:0}
+.map-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.empty{text-align:center;padding:48px 20px;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+@media(max-width:700px){.ov-grid{grid-template-columns:1fr}.ov-grid .full{grid-column:1}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">TERRAH / B2B Pipeline</div>
+  <div class="header-right">
+    <span id="last-refresh" style="font-size:10px;font-family:'DM Mono',monospace;color:var(--muted)"></span>
+    <button class="btn-sec" onclick="fetchSheet()">↻ Refresh</button>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat"><div class="stat-val" id="s-total">—</div><div class="stat-label">Prospects actifs</div></div>
+  <div class="stat"><div class="stat-val" id="s-pipe">—</div><div class="stat-label">En pipeline</div></div>
+  <div class="stat"><div class="stat-val" id="s-actif">—</div><div class="stat-label">Clients actifs</div></div>
+  <div class="stat"><div class="stat-val red" id="s-alert">—</div><div class="stat-label">À relancer</div></div>
+  <div class="stat"><div class="stat-val red" id="s-mort">—</div><div class="stat-label">💀 Flag mort</div></div>
+</div>
+
+<div class="toolbar">
+  <div class="view-toggle">
+    <button class="view-btn active" onclick="setView('overview')">Vue d'ensemble</button>
+    <button class="view-btn" onclick="setView('kanban')">Kanban</button>
+    <button class="view-btn" onclick="setView('list')">Liste</button>
+    <button class="view-btn" onclick="setView('map')">Carte</button>
+  </div>
+  <div class="filter-group" id="filter-group" style="display:none">
+    <div id="filterCatBtns" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+    <select id="filterEtape" onchange="renderAll()"><option value="">Toutes étapes</option></select>
+    <select id="filterAlert" onchange="renderAll()">
+      <option value="">Tous</option>
+      <option value="alert">⚠ À relancer</option>
+      <option value="flagmort">💀 Flag mort</option>
+    </select>
+    <select id="filterTaille" onchange="renderAll()">
+      <option value="">Toutes tailles</option>
+      <option value="5">★★★★★</option>
+      <option value="4">★★★★+</option>
+      <option value="3">★★★+</option>
+      <option value="2">★★+</option>
+    </select>
+    <input type="text" id="search" placeholder="Rechercher…" oninput="renderAll()" style="width:140px"/>
+  </div>
+</div>
+
+<div class="main">
+  <div id="overview-view"><div class="empty"><span class="spinner"></span>Chargement…</div></div>
+  <div class="kanban" id="kanban-view" style="display:none"></div>
+  <div id="map-view" style="display:none;height:calc(100vh - 158px);min-height:480px;border-radius:6px;overflow:hidden;border:1px solid var(--border);position:relative">
+    <div id="map-legend" style="position:absolute;bottom:16px;right:10px;z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:9px 12px;font-family:'DM Mono',monospace;font-size:10px;pointer-events:none"></div>
+  </div>
+    <table>
+      <thead><tr>
+        <th onclick="sortBy('Nom')">Nom</th>
+        <th onclick="sortBy('Catégorie')">Catégorie</th>
+        <th onclick="sortBy('Opportunité')">Taille</th>
+        <th onclick="sortBy('Etape')">Étape</th>
+        <th onclick="sortBy('Date maj statut')">MàJ</th>
+        <th>Délai</th>
+        <th>Projet</th>
+        <th>Contact</th>
+        <th>Commentaires</th>
+      </tr></thead>
+      <tbody id="list-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-name" id="m-name"></div>
+    <div class="modal-sub" id="m-sub"></div>
+    <div class="modal-grid">
+      <div class="modal-field"><label>Statut</label><span id="m-status"></span></div>
+      <div class="modal-field"><label>Étape</label><span id="m-etape"></span></div>
+      <div class="modal-field"><label>Dernière MàJ</label><span id="m-date"></span></div>
+      <div class="modal-field"><label>Téléphone</label><span id="m-tel"></span></div>
+      <div class="modal-field"><label>Email</label><span id="m-email"></span></div>
+      <div class="modal-field"><label>Projet</label><span id="m-projet"></span></div>
+    </div>
+    <div class="modal-comment" id="m-comment"></div>
+    <button class="btn-sec" onclick="document.getElementById('modal').classList.remove('open')">Fermer</button>
+  </div>
+</div>
+
+<script>
+const SHEET_ID  = '1zo5C1lJHX9rA5XFUe3M8_nt7s-Jwbg1_Ut8NqTE4Cxg';
+const SHEET_TAB = 'crm';
+
+const ETAPES = ['Ciblé','Contacté','Café à déposer / envoyer','Visité','Devis envoyé','Relancé','Relancé bis','Première commande','Deuxième commande','Mort for now'];
+const ETAPE_SLUGS = {'Ciblé':'ciblé','Contacté':'contacté','Café à déposer / envoyer':'cafe-depot','Visité':'visité','Devis envoyé':'devis','Relancé':'relancé','Relancé bis':'relancé2','Première commande':'p1','Deuxième commande':'p2','Mort for now':'mort'};
+const ETAPE_COLORS = {'ciblé':'#555','contacté':'#7eb5c8','cafe-depot':'#c8a97e','visité':'#7ec8a0','devis':'#c8c07e','relancé':'#c89a7e','relancé2':'#c87e7e','p1':'#7ec898','p2':'#5ec878','mort':'#443'};
+
+const CATS = ['Café','Avocats','Restaurant','Brunch','Boulangerie-Pâtisserie','Bureau','Partenaire'];
+const CAT_COLORS = {'Café':'#c8a97e','Avocats':'#7eb5c8','Restaurant':'#a07ec8','Brunch':'#c87ea0','Boulangerie-Pâtisserie':'#7ec8a0','Bureau':'#c8c07e','Partenaire':'#e87e7e'};
+
+const STATUS_COLORS = {prospect:'#555',pipeline:'#7eb5c8',a_relancer:'#c89a7e',actif:'#5ec878',flag_mort:'#e87e7e',mort:'#2a2a2a'};
+const STATUS_LABELS = {prospect:'Prospect froid',pipeline:'En pipeline',a_relancer:'À relancer',actif:'Client actif',flag_mort:'💀 Flag mort',mort:'Mort for now'};
+
+let allRows = [];
+let currentView = 'overview';
+let sortCol = 'Date maj statut', sortAsc = false;
+let selectedCats = new Set();
+
+// ── CLASSIFY ──
+function classify(row) {
+  const e = row['Etape']||'', d = daysSince(row['Date maj statut']);
+  if (e==='Mort for now') return 'mort';
+  if (e==='Première commande'||e==='Deuxième commande') return 'actif';
+  if (e==='Relancé bis'&&d!==null&&d>7) return 'flag_mort';
+  if ((e==='Relancé'||e==='Visité'||e==='Devis envoyé'||e==='Café à déposer / envoyer')&&d!==null&&d>7) return 'a_relancer';
+  if ((e==='Contacté'||e==='Visité'||e==='Devis envoyé'||e==='Café à déposer / envoyer'||e==='Relancé')&&d!==null&&d<=7) return 'pipeline';
+  return 'prospect';
+}
+const isAlert    = r => ['a_relancer','flag_mort'].includes(classify(r));
+const isFlagMort = r => classify(r)==='flag_mort';
+
+// ── UTILS ──
+function daysSince(d) { if(!d||!(d instanceof Date))return null; return Math.floor((Date.now()-d.getTime())/86400000); }
+function fmtDate(d)   { if(!d||!(d instanceof Date))return '—'; return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit'}); }
+function stars(val) {
+  const n=parseInt(val)||0; if(!n)return '<span style="color:var(--muted);font-size:10px">—</span>';
+  const c=n>=4?'#c8a97e':n>=3?'#a09060':'#777';
+  return `<span style="color:${c};font-size:12px;letter-spacing:2px">${'★'.repeat(n)}<span style="color:#1e1e1e">${'☆'.repeat(5-n)}</span></span>`;
+}
+function catTag(cat) { const c=CAT_COLORS[cat]||'#666'; return cat?`<span style="font-size:10px;font-family:'DM Mono',monospace;color:${c}">${cat}</span>`:''; }
+function eslug(e)    { return ETAPE_SLUGS[e]||'ciblé'; }
+
+// ── FETCH ──
+function fetchSheet() {
+  document.getElementById('overview-view').innerHTML='<div class="empty"><span class="spinner"></span>Chargement…</div>';
+  const old=document.getElementById('_gviz'); if(old)old.remove();
+  if(window.__gTO)clearTimeout(window.__gTO);
+  const cb='_gCB'+Date.now();
+  window[cb]=json=>{ delete window[cb];
+    if(!json.table){showErr('Onglet introuvable');return;}
+    parseGViz(json); populateFilters(); renderAll();
+    document.getElementById('last-refresh').textContent='màj '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  };
+  window.__gTO=setTimeout(()=>{ if(window[cb]){delete window[cb];showErr('Timeout');} },8000);
+  const s=document.createElement('script'); s.id='_gviz';
+  s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json:responseHandler:${cb}&sheet=${encodeURIComponent(SHEET_TAB)}&headers=1`;
+  s.onerror=()=>showErr('Script bloqué'); document.head.appendChild(s);
+}
+function showErr(msg){ document.getElementById('overview-view').innerHTML=`<div class="empty">❌ ${msg}</div>`; }
+
+function parseGViz(json) {
+  const cols=json.table.cols.map(c=>c.label);
+  allRows=(json.table.rows||[]).map(r=>{
+    const obj={};
+    cols.forEach((col,i)=>{ const cell=r.c[i];
+      if(!cell||cell.v===null){obj[col]='';return;}
+      if(typeof cell.v==='string'&&cell.v.startsWith('Date(')){
+        const p=cell.v.slice(5,-1).split(',').map(Number); obj[col]=new Date(p[0],p[1],p[2]);
+      } else { obj[col]=cell.v; }
+    }); return obj;
+  }).filter(r=>r['Nom']&&r['Nom']!=='');
+}
+
+// ── FILTERS ──
+function populateFilters() {
+  renderCatFilterBtns();
+  const se=document.getElementById('filterEtape');
+  se.innerHTML='<option value="">Toutes étapes</option>';
+  ETAPES.forEach(e=>{ const o=document.createElement('option');o.value=e;o.textContent=e;se.appendChild(o); });
+}
+
+function filteredRows() {
+  const fE=document.getElementById('filterEtape').value;
+  const fA=document.getElementById('filterAlert').value;
+  const fT=parseInt(document.getElementById('filterTaille').value)||0;
+  const q=document.getElementById('search').value.toLowerCase();
+  return allRows.filter(r=>{
+    if(selectedCats.size>0&&!selectedCats.has(r['Catégorie']))return false;
+    if(fE&&r['Etape']!==fE)return false;
+    if(fA==='alert'&&!isAlert(r))return false;
+    if(fA==='flagmort'&&!isFlagMort(r))return false;
+    if(fT&&(parseInt(r['Opportunité'])||0)<fT)return false;
+    if(q){const h=[r['Nom'],r['Catégorie'],r['Contact'],r['Projet'],r['Commentaires']].join(' ').toLowerCase();if(!h.includes(q))return false;}
+    return true;
+  });
+}
+
+// ── STATS BAR ──
+function updateStats() {
+  const a=allRows;
+  document.getElementById('s-total').textContent = a.filter(r=>classify(r)!=='mort').length||'—';
+  document.getElementById('s-pipe').textContent  = a.filter(r=>classify(r)==='pipeline').length||'—';
+  document.getElementById('s-actif').textContent = a.filter(r=>classify(r)==='actif').length||'—';
+  document.getElementById('s-alert').textContent = a.filter(r=>classify(r)==='a_relancer').length||'—';
+  document.getElementById('s-mort').textContent  = a.filter(r=>classify(r)==='flag_mort').length||'—';
+}
+
+// ── DONUT SVG ──
+function buildDonut(rows, size=170) {
+  const ORDER=['actif','pipeline','prospect','a_relancer','flag_mort','mort'];
+  const counts={}; ORDER.forEach(k=>counts[k]=0);
+  rows.forEach(r=>{ const c=classify(r); if(c in counts)counts[c]++; });
+  const total=rows.length||1;
+  const data=ORDER.map(k=>({key:k,label:STATUS_LABELS[k],val:counts[k],color:STATUS_COLORS[k],pct:Math.round(counts[k]/total*100)})).filter(d=>d.val>0);
+  const cx=size/2, cy=size/2, R=size/2-8, ri=R*0.56;
+  let angle=-Math.PI/2, paths='';
+  data.forEach(d=>{
+    const sw=(d.val/total)*2*Math.PI; if(sw<0.003)return;
+    const x1=cx+R*Math.cos(angle),y1=cy+R*Math.sin(angle);
+    const x2=cx+R*Math.cos(angle+sw),y2=cy+R*Math.sin(angle+sw);
+    const xi1=cx+ri*Math.cos(angle),yi1=cy+ri*Math.sin(angle);
+    const xi2=cx+ri*Math.cos(angle+sw),yi2=cy+ri*Math.sin(angle+sw);
+    const lg=sw>Math.PI?1:0;
+    paths+=`<path d="M${xi1},${yi1}L${x1},${y1}A${R},${R},0,${lg},1,${x2},${y2}L${xi2},${yi2}A${ri},${ri},0,${lg},0,${xi1},${yi1}Z" fill="${d.color}" opacity=".88"><title>${d.label}: ${d.val} (${d.pct}%)</title></path>`;
+    angle+=sw;
+  });
+  const svg=`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex-shrink:0">${paths}
+    <circle cx="${cx}" cy="${cy}" r="${ri-2}" fill="var(--surface)"/>
+    <text x="${cx}" y="${cy-4}" text-anchor="middle" fill="var(--text)" font-family="Syne" font-size="17" font-weight="800">${total}</text>
+    <text x="${cx}" y="${cy+11}" text-anchor="middle" fill="var(--muted)" font-family="DM Mono" font-size="7" letter-spacing="1">TOTAL</text>
+  </svg>`;
+  const legend=data.map(d=>`<div class="legend-row"><div class="legend-dot" style="background:${d.color}"></div><span class="legend-label">${d.label}</span><span class="legend-val">${d.val}</span><span class="legend-pct">${d.pct}%</span></div>`).join('');
+  return {svg,legend};
+}
+
+// ── OVERVIEW ──
+function renderOverview() {
+  const ov=document.getElementById('overview-view');
+  const now=Date.now(), d7=7*86400000;
+  const aRel=allRows.filter(r=>classify(r)==='a_relancer').sort((a,b)=>(a['Date maj statut']||0)-(b['Date maj statut']||0));
+  const fMort=allRows.filter(r=>classify(r)==='flag_mort').sort((a,b)=>(a['Date maj statut']||0)-(b['Date maj statut']||0));
+  const rec7=allRows.filter(r=>{ const d=r['Date maj statut']; return d instanceof Date&&(now-d.getTime())<=d7; });
+
+  const dRows = selectedCats.size===0 ? allRows : allRows.filter(r=>selectedCats.has(r['Catégorie']));
+  const {svg:donutSvg,legend:donutLegend}=buildDonut(dRows);
+
+  const activeCats=CATS.filter(c=>allRows.some(r=>r['Catégorie']===c));
+  const maxCat=Math.max(...activeCats.map(c=>allRows.filter(r=>r['Catégorie']===c).length),1);
+
+  const catCards=activeCats.map(c=>{
+    const rows=allRows.filter(r=>r['Catégorie']===c);
+    const n=rows.length, pct=Math.round(n/maxCat*100);
+    const pipe=rows.filter(r=>classify(r)==='pipeline').length;
+    const rel=rows.filter(r=>isAlert(r)).length;
+    const act=rows.filter(r=>classify(r)==='actif').length;
+    const col=CAT_COLORS[c]||'#888';
+    return `<div class="cat-card" style="border-left-color:${col}" onclick="drillCat('${c}')">
+      <div class="cc-head"><span class="cc-name" style="color:${col}">${c}</span><span class="cc-total">${n} prospects</span></div>
+      <div class="cc-bar"><div class="cc-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+      <div class="cc-stats">
+        <span style="color:#7eb5c8">⬤ ${pipe} pipeline</span>
+        <span style="color:#e87e7e">⚠ ${rel} relance</span>
+        <span style="color:#5ec878">✓ ${act} actif${act>1?'s':''}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const byE={}; ETAPES.forEach(e=>{byE[e]=allRows.filter(r=>r['Etape']===e).length;}); const maxE=Math.max(...Object.values(byE),1);
+  const byT={0:0,1:0,2:0,3:0,4:0,5:0};
+  allRows.forEach(r=>{const n=Math.min(parseInt(r['Opportunité'])||0,5);byT[n]=(byT[n]||0)+1;});
+  const maxT=Math.max(...Object.values(byT),1);
+
+  const alertRows = r => {
+    const d=daysSince(r['Date maj statut']);
+    const safe=r['Nom'].replace(/'/g,"\\'");
+    return `<div class="ov-row" style="cursor:pointer" onclick="openModal(allRows.find(x=>x['Nom']==='${safe}'))">
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:6px;height:6px;border-radius:50%;background:#e87e7e;flex-shrink:0"></div>
+        <strong style="font-size:11px;color:#e87e7e">${r['Nom']}</strong>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        ${catTag(r['Catégorie'])}
+        <span class="tag tag-${eslug(r['Etape'])}">${r['Etape']}</span>
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:#e87e7e">J+${d}</span>
+      </div>
+    </div>`;
+  };
+
+  ov.innerHTML=`<div class="ov-grid">
+
+    <!-- DONUT -->
+    <div class="ov-block">
+      <div class="ov-title">Avancement — répartition</div>
+      <div class="donut-sel">
+        <button class="${selectedCats.size===0?'active':''}" onclick="setDonut('global')">Global</button>
+        ${activeCats.map(c=>{const on=selectedCats.has(c);const col=CAT_COLORS[c]||'#888';return `<button class="${on?'active':''}" onclick="setDonut('${c}')" style="${on?`background:${col};border-color:${col};color:#0e0e0e`:`border-color:${col};color:${col}`}">${c}</button>`;}).join('')}
+      </div>
+      <div class="donut-wrap">${donutSvg}<div class="donut-legend">${donutLegend}</div></div>
+    </div>
+
+    <!-- ALERTES -->
+    <div class="ov-block">
+      <div class="ov-title">⚠ À relancer ${aRel.length>0?`<span style="background:#4a1010;color:#e87e7e;padding:1px 7px;border-radius:10px;font-size:9px">${aRel.length}</span>`:''}</div>
+      ${aRel.length===0?'<div style="color:#5ec878;font-size:11px;font-family:DM Mono,monospace">✓ Rien à relancer</div>':aRel.slice(0,6).map(alertRows).join('')}
+      ${fMort.length>0?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="font-size:9px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.1em;color:#ff4444;margin-bottom:8px">💀 À passer en mort for now <span style="background:#4a0a0a;padding:1px 6px;border-radius:8px">${fMort.length}</span></div>
+        ${fMort.map(r=>{const d=daysSince(r['Date maj statut']);const safe=r['Nom'].replace(/'/g,"\\'");return `<div class="ov-row" style="cursor:pointer" onclick="openModal(allRows.find(x=>x['Nom']==='${safe}'))">
+          <strong style="font-size:11px;color:#ff4444">${r['Nom']}</strong>
+          <div style="display:flex;align-items:center;gap:6px">${catTag(r['Catégorie'])}<span style="font-family:'DM Mono',monospace;font-size:10px;color:#ff4444">J+${d}</span></div></div>`;}).join('')}
+      </div>`:''}</div>
+
+    <!-- PAR CATÉGORIE -->
+    <div class="ov-block full">
+      <div class="ov-title">Par catégorie <span style="font-size:9px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— cliquer pour voir dans le Kanban</span></div>
+      <div class="cat-grid">${catCards}</div>
+    </div>
+
+    <!-- ACTIVITÉ 7J -->
+    <div class="ov-block">
+      <div class="ov-title">Activité — 7 derniers jours</div>
+      <div style="margin-bottom:12px"><div class="big-num">${rec7.length}</div><div class="big-label">interactions enregistrées</div></div>
+      ${rec7.length===0
+        ?'<div style="color:var(--muted);font-size:10px;font-family:DM Mono,monospace">Aucune MàJ récente</div>'
+        :rec7.slice(0,7).map(r=>{const safe=r['Nom'].replace(/'/g,"\\'");return `<div class="ov-row" style="cursor:pointer" onclick="openModal(allRows.find(x=>x['Nom']==='${safe}'))">
+          <div style="display:flex;align-items:center;gap:6px"><div style="width:6px;height:6px;border-radius:50%;background:var(--accent)"></div><strong style="font-size:11px">${r['Nom']}</strong></div>
+          <div style="display:flex;align-items:center;gap:6px">${catTag(r['Catégorie'])}<span class="tag tag-${eslug(r['Etape'])}">${r['Etape']}</span><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${fmtDate(r['Date maj statut'])}</span></div>
+        </div>`;}).join('')}
+    </div>
+
+    <!-- RÉPARTITION TAILLE -->
+    <div class="ov-block">
+      <div class="ov-title">Répartition par opportunité</div>
+      ${[5,4,3,2,1].map(n=>{
+        const count=byT[n]||0, pct=Math.round(count/maxT*100);
+        const col=n>=4?'#c8a97e':n>=3?'#a09060':'#666';
+        return `<div class="ov-row">
+          <div style="font-size:12px;letter-spacing:2px;color:${col};min-width:74px">${'★'.repeat(n)}<span style="color:#1e1e1e">${'☆'.repeat(5-n)}</span></div>
+          <div class="ov-bar-wrap"><div class="ov-bar" style="width:${pct}%;background:${col}"></div></div>
+          <div class="ov-row-val">${count}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+  </div>`;
+}
+
+function setDonut(cat) {
+  if (cat==='global') { selectedCats.clear(); }
+  else {
+    if (selectedCats.has(cat)) selectedCats.delete(cat);
+    else selectedCats.add(cat);
+  }
+  renderCatFilterBtns();
+  renderAll();
+}
+
+function toggleCat(cat) {
+  if (selectedCats.has(cat)) selectedCats.delete(cat);
+  else selectedCats.add(cat);
+  renderCatFilterBtns();
+  renderAll();
+}
+
+function renderCatFilterBtns() {
+  const wrap = document.getElementById('filterCatBtns');
+  if (!wrap) return;
+  const activeCats = [...new Set(allRows.map(r=>r['Catégorie']).filter(Boolean))].sort();
+  // "Tous" button
+  const allActive = selectedCats.size === 0;
+  wrap.innerHTML = `<button class="cat-filter-btn${allActive?' active':''}" onclick="clearCats()" style="${allActive?'background:var(--accent);border-color:var(--accent)':''}">Tous</button>`
+    + activeCats.map(c => {
+        const on = selectedCats.has(c);
+        const col = CAT_COLORS[c]||'#888';
+        return `<button class="cat-filter-btn${on?' active':''}" onclick="toggleCat('${c}')"
+          style="${on?`background:${col};border-color:${col}`:`border-color:${col};color:${col}`}">${c}</button>`;
+      }).join('');
+}
+
+function clearCats() {
+  selectedCats.clear();
+  renderCatFilterBtns();
+  renderAll();
+}
+
+function drillCat(cat) {
+  selectedCats.clear();
+  selectedCats.add(cat);
+  setView('kanban');
+}
+
+// ── KANBAN ──
+function renderKanban() {
+  const kv=document.getElementById('kanban-view');
+  kv.innerHTML='';
+  ETAPES.forEach(etape=>{
+    const cr=filteredRows().filter(r=>r['Etape']===etape);
+    const slug=eslug(etape), color=ETAPE_COLORS[slug]||'#888';
+    const col=document.createElement('div'); col.className='k-col';
+    col.innerHTML=`<div class="k-header"><span class="k-title" style="color:${color}">${etape}</span><span class="k-count">${cr.length}</span></div>`;
+    const cards=document.createElement('div'); cards.className='k-cards';
+    if(!cr.length){ cards.innerHTML='<div style="padding:5px;font-size:9px;color:var(--muted);font-family:DM Mono,monospace">—</div>'; }
+    else cr.forEach(row=>{
+      const alert=isAlert(row),flagM=isFlagMort(row),days=daysSince(row['Date maj statut']);
+      const cat=row['Catégorie']||'',catCol=CAT_COLORS[cat]||'#666';
+      const card=document.createElement('div');
+      card.className='card'+(flagM?' flagmort':alert?' alert':'');
+      card.innerHTML=`
+        ${flagM?'<div class="card-dot" style="background:#ff4444"></div>':alert?'<div class="card-dot" style="background:#e87e7e"></div>':''}
+        <div class="card-name">${row['Nom']||'?'}</div>
+        ${cat?`<div class="card-cat" style="color:${catCol}">${cat}</div>`:''}
+        <div>${stars(row['Opportunité'])}</div>
+        ${flagM?'<div style="font-size:8px;color:#ff4444;font-family:DM Mono,monospace;margin-top:2px">💀 Mort for now ?</div>':''}
+        <div class="card-date">${fmtDate(row['Date maj statut'])}${days!==null?` · J+${days}`:''}</div>`;
+      card.onclick=()=>openModal(row);
+      cards.appendChild(card);
+    });
+    col.appendChild(cards); kv.appendChild(col);
+  });
+}
+
+// ── LIST ──
+function renderList() {
+  const tbody=document.getElementById('list-body');
+  const rows=filteredRows().slice().sort((a,b)=>{
+    let va=a[sortCol],vb=b[sortCol];
+    if(va instanceof Date&&vb instanceof Date)return sortAsc?va-vb:vb-va;
+    va=String(va||'').toLowerCase();vb=String(vb||'').toLowerCase();
+    return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+  });
+  tbody.innerHTML='';
+  rows.forEach(row=>{
+    const alert=isAlert(row),flagM=isFlagMort(row),days=daysSince(row['Date maj statut']);
+    const slug=eslug(row['Etape']||'');
+    let dc='days-ok',dl=days!==null?`J+${days}`:'—';
+    if(flagM||classify(row)==='a_relancer')dc='days-hot';
+    else if(days!==null&&days>4)dc='days-warn';
+    const tr=document.createElement('tr');
+    if(flagM)tr.className='row-flagmort'; else if(alert)tr.className='row-alert';
+    tr.innerHTML=`
+      <td><strong>${row['Nom']||'?'}</strong></td>
+      <td>${catTag(row['Catégorie'])}</td>
+      <td>${stars(row['Opportunité'])}</td>
+      <td><span class="tag tag-${slug}">${row['Etape']||'—'}</span></td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px">${fmtDate(row['Date maj statut'])}</td>
+      <td><span class="days-badge ${dc}">${dl}</span></td>
+      <td style="font-size:11px">${row['Projet']||'—'}</td>
+      <td style="font-size:11px">${row['Contact']||'—'}</td>
+      <td class="comment-cell" title="${(row['Commentaires']||'').replace(/"/g,'&quot;')}">${row['Commentaires']||'—'}</td>`;
+    tr.onclick=()=>openModal(row);
+    tbody.appendChild(tr);
+  });
+  if(!rows.length)tbody.innerHTML='<tr><td colspan="9" style="padding:32px;text-align:center;color:var(--muted);font-family:DM Mono,monospace">Aucun résultat</td></tr>';
+}
+
+// ── MAP ──
+let leafletMap = null;
+let mapMarkers = [];
+
+function renderMap() {
+  const container = document.getElementById('map-view');
+
+  // Init map only once container is visible
+  if (!leafletMap) {
+    leafletMap = L.map(container, { center:[48.866,2.333], zoom:13, preferCanvas:true });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution:'© OpenStreetMap © CARTO', maxZoom:19
+    }).addTo(leafletMap);
+  }
+
+  // Always invalidate size in case container just became visible
+  setTimeout(() => {
+    leafletMap.invalidateSize();
+
+    // Clear markers
+    mapMarkers.forEach(m=>m.remove()); mapMarkers=[];
+
+    const rows = filteredRows().filter(r => r['y'] && r['x']);
+    rows.forEach(row => {
+      const lat=parseFloat(row['y']), lon=parseFloat(row['x']);
+      if(isNaN(lat)||isNaN(lon)) return;
+      const c=classify(row), color=STATUS_COLORS[c]||'#888';
+      const flagM=isFlagMort(row), alert=isAlert(row);
+      const icon=L.divIcon({ className:'',
+        html:`<div style="width:13px;height:13px;border-radius:50%;background:${color};border:2px solid ${flagM?'#ff4444':alert?'#e87e7e':'rgba(255,255,255,.25)'};box-shadow:0 0 ${alert||flagM?8:4}px ${color}"></div>`,
+        iconSize:[13,13], iconAnchor:[6,6]
+      });
+      const days=daysSince(row['Date maj statut']);
+      const smap={prospect:'Prospect',pipeline:'🔵 En pipeline',a_relancer:'⚠ À relancer',actif:'✅ Client actif',flag_mort:'💀 Flag mort',mort:'Mort for now'};
+      const popup=L.popup({closeButton:false,maxWidth:240}).setContent(`
+        <div class="pop-name">${row['Nom']||'?'}</div>
+        <div style="margin-bottom:6px">${stars(row['Opportunité'])} <span style="font-family:'DM Mono',monospace;font-size:10px;color:${CAT_COLORS[row['Catégorie']]||'#888'}">${row['Catégorie']||''}</span></div>
+        <div class="pop-row">Statut : <span>${smap[c]||'—'}</span></div>
+        <div class="pop-row">Étape : <span>${row['Etape']||'—'}</span></div>
+        <div class="pop-row">MàJ : <span>${fmtDate(row['Date maj statut'])}${days!==null?' · J+'+days:''}</span></div>
+        ${row['Commentaires']?`<div class="pop-row" style="margin-top:5px;font-size:10px">${row['Commentaires']}</div>`:''}
+      `);
+      const marker=L.marker([lat,lon],{icon}).addTo(leafletMap).bindPopup(popup);
+      mapMarkers.push(marker);
+    });
+
+    if(mapMarkers.length>0) leafletMap.fitBounds(L.featureGroup(mapMarkers).getBounds().pad(0.15));
+
+    // Legend
+    const legend = document.getElementById('map-legend');
+    if(legend) legend.innerHTML = Object.entries(STATUS_COLORS).filter(([k])=>k!=='mort').map(([k,col])=>
+      `<div style="display:flex;align-items:center;gap:7px;margin-bottom:4px"><div style="width:9px;height:9px;border-radius:50%;background:${col}"></div><span style="color:#ccc">${STATUS_LABELS[k]||k}</span></div>`
+    ).join('') + `<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--accent)">${rows.length} prospects affichés</div>`;
+  }, 100);
+}
+
+// ── VIEW ──
+function setView(v) {
+  currentView=v;
+  document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.view-btn')[['overview','kanban','list','map'].indexOf(v)].classList.add('active');
+  document.getElementById('overview-view').style.display = v==='overview'?'block':'none';
+  document.getElementById('kanban-view').style.display   = v==='kanban'  ?'flex' :'none';
+  document.getElementById('list-view').style.display     = v==='list'    ?'block':'none';
+  document.getElementById('map-view').style.display      = v==='map'     ?'block':'none';
+  document.getElementById('filter-group').style.display  = v==='overview'?'none':'flex';
+  renderAll();
+}
+
+function renderAll(){ updateStats(); if(currentView==='overview')renderOverview(); else if(currentView==='kanban')renderKanban(); else if(currentView==='list')renderList(); else if(currentView==='map')renderMap(); }
+function sortBy(col){ if(sortCol===col)sortAsc=!sortAsc; else{sortCol=col;sortAsc=true;} renderList(); }
+
+// ── MODAL ──
+function openModal(row) {
+  if(!row)return;
+  const c=classify(row);
+  const smap={prospect:'Prospect',pipeline:'🔵 En pipeline',a_relancer:'⚠ À relancer',actif:'✅ Client actif',flag_mort:'💀 Flag mort',mort:'Mort for now'};
+  document.getElementById('m-name').textContent=row['Nom']||'?';
+  document.getElementById('m-sub').innerHTML=`${stars(row['Opportunité'])} ${catTag(row['Catégorie'])}`;
+  document.getElementById('m-status').textContent=smap[c]||'—';
+  document.getElementById('m-etape').textContent=row['Etape']||'—';
+  document.getElementById('m-date').textContent=fmtDate(row['Date maj statut']);
+  document.getElementById('m-tel').textContent=row['Téléphone']||'—';
+  document.getElementById('m-email').textContent=row['Email']||'—';
+  document.getElementById('m-projet').textContent=row['Projet']||'—';
+  document.getElementById('m-comment').textContent=row['Commentaires']||'Aucun commentaire.';
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(e){ if(e.target===document.getElementById('modal'))document.getElementById('modal').classList.remove('open'); }
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', () => {
+  setView('overview');
+  fetchSheet();
+});
+</script>
+</body>
+</html>
