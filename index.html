@@ -633,9 +633,7 @@ function renderMap() {
       mapMarkers.push(marker);
     });
 
-    if(mapMarkers.length>0) leafletMap.fitBounds(L.featureGroup(mapMarkers).getBounds().pad(0.15));
-
-    // Legend
+    // Légende
     const legend = document.getElementById('map-legend');
     if(legend) legend.innerHTML = Object.entries(STATUS_COLORS).filter(([k])=>k!=='mort').map(([k,col])=>
       `<div style="display:flex;align-items:center;gap:7px;margin-bottom:4px"><div style="width:9px;height:9px;border-radius:50%;background:${col}"></div><span style="color:#ccc">${STATUS_LABELS[k]||k}</span></div>`
